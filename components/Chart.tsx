@@ -41,9 +41,106 @@ export const ChartComponent = (props: any) => {
         background: { type: ColorType.Solid, color: backgroundColor },
         textColor,
       },
+      crosshair: {
+        // hide the horizontal crosshair line
+        horzLine: {
+          visible: false,
+          labelVisible: false,
+        },
+        // hide the vertical crosshair label
+        vertLine: {
+          labelVisible: false,
+        },
+      },
+      // hide the grid lines
+      grid: {
+        vertLines: {
+          visible: false,
+        },
+        horzLines: {
+          visible: false,
+        },
+      },
       width: chartContainerRef.current.clientWidth,
       height: 300,
     });
+    const chartOptions = {
+      layout: {
+        textColor: "black",
+        background: { type: "solid", color: "white" },
+      },
+    };
+
+    const series = chart.addAreaSeries({
+      topColor: "#2962FF",
+      bottomColor: "rgba(41, 98, 255, 0.28)",
+      lineColor: "#2962FF",
+      lineWidth: 2,
+    });
+    series.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.3, // leave some space for the legend
+        bottom: 0.25,
+      },
+    });
+
+    series.setData(initialData);
+
+    const container = chartContainerRef.current;
+
+    const toolTipWidth = 80;
+    const toolTipHeight = 80;
+    const toolTipMargin = 15;
+
+    // Create and style the tooltip html element
+    const toolTip = document.createElement("div");
+    // @ts-ignore
+    toolTip.style = `width: 96px; height: 80px; position: absolute; display: none; padding: 8px; box-sizing: border-box; font-size: 12px; text-align: left; z-index: 1000; top: 12px; left: 12px; pointer-events: none; border: 1px solid; border-radius: 2px;font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;`;
+    toolTip.style.background = "white";
+    toolTip.style.color = "black";
+    toolTip.style.borderColor = "#2962FF";
+    container.appendChild(toolTip);
+
+    // update tooltip
+    chart.subscribeCrosshairMove((param) => {
+      if (
+        param.point === undefined ||
+        !param.time ||
+        param.point.x < 0 ||
+        param.point.x > container.clientWidth ||
+        param.point.y < 0 ||
+        param.point.y > container.clientHeight
+      ) {
+        toolTip.style.display = "none";
+      } else {
+        // time will be in the same format that we supplied to setData.
+        // thus it will be YYYY-MM-DD
+        const dateStr = param.time;
+        toolTip.style.display = "block";
+        const data = param.seriesData.get(series)!;
+        // @ts-ignore
+        const price = data.value ?? data.close;
+        toolTip.innerHTML = `<div style="color: ${"#2962FF"}">Apple Inc.</div><div style="font-size: 24px; margin: 4px 0px; color: ${"black"}">
+          ${Math.round(100 * price) / 100}
+          </div><div style="color: ${"black"}">
+          ${dateStr}
+          </div>`;
+
+        const coordinate = series.priceToCoordinate(price);
+        let shiftedCoordinate = param.point.x - 50;
+        if (coordinate === null) {
+          return;
+        }
+        shiftedCoordinate = Math.max(0, Math.min(container.clientWidth - toolTipWidth, shiftedCoordinate));
+        const coordinateY =
+          coordinate - toolTipHeight - toolTipMargin > 0
+            ? coordinate - toolTipHeight - toolTipMargin
+            : Math.max(0, Math.min(container.clientHeight - toolTipHeight - toolTipMargin, coordinate + toolTipMargin));
+        toolTip.style.left = shiftedCoordinate + "px";
+        toolTip.style.top = coordinateY + "px";
+      }
+    });
+
     chart.timeScale().fitContent();
 
     const newSeries = chart.addAreaSeries({
@@ -69,8 +166,9 @@ const CoinChart = () => {
   const ref = useRef<HTMLDivElement | null>(null);
   const scroll = useInViewport(ref);
   return (
-    <div id="CoinChart" className="coin-charts" ref={ref}>
-      <ChartComponent data={initialData} />
+    <div id="CoinChart" className="coin-charts relative">
+      <ChartComponent data={initialData} ref={ref} />
+
       <p>{JSON.stringify(scroll)}</p>
     </div>
   );
