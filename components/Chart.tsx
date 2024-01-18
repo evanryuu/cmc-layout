@@ -2,7 +2,8 @@
 
 import { useInViewport } from "ahooks";
 import { createChart, ColorType } from "lightweight-charts";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import Tweet from "./Tweet";
 
 const initialData = [
   { time: "2018-12-22", value: 32.51 },
@@ -28,6 +29,9 @@ export const ChartComponent = (props: any) => {
       areaBottomColor = "rgba(41, 98, 255, 0.28)",
     } = {},
   } = props;
+
+  const [date, setDate] = useState("");
+  const [price, setPrice] = useState("");
 
   const chartContainerRef = useRef<any>();
 
@@ -64,27 +68,6 @@ export const ChartComponent = (props: any) => {
       width: chartContainerRef.current.clientWidth,
       height: 300,
     });
-    const chartOptions = {
-      layout: {
-        textColor: "black",
-        background: { type: "solid", color: "white" },
-      },
-    };
-
-    const series = chart.addAreaSeries({
-      topColor: "#2962FF",
-      bottomColor: "rgba(41, 98, 255, 0.28)",
-      lineColor: "#2962FF",
-      lineWidth: 2,
-    });
-    series.priceScale().applyOptions({
-      scaleMargins: {
-        top: 0.3, // leave some space for the legend
-        bottom: 0.25,
-      },
-    });
-
-    series.setData(initialData);
 
     const container = chartContainerRef.current;
 
@@ -93,17 +76,15 @@ export const ChartComponent = (props: any) => {
     const toolTipMargin = 15;
 
     // Create and style the tooltip html element
-    const toolTip = document.createElement("div");
-    // @ts-ignore
-    toolTip.style = `width: 96px; height: 80px; position: absolute; display: none; padding: 8px; box-sizing: border-box; font-size: 12px; text-align: left; z-index: 1000; top: 12px; left: 12px; pointer-events: none; border: 1px solid; border-radius: 2px;font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;`;
-    toolTip.style.background = "white";
-    toolTip.style.color = "black";
-    toolTip.style.borderColor = "#2962FF";
-    container.appendChild(toolTip);
+    const toolTip = document.querySelector(".tool-tip")! as HTMLDivElement;
 
+    chart.subscribeClick((param) => {
+      console.log(param);
+    });
     // update tooltip
     chart.subscribeCrosshairMove((param) => {
       if (
+        !param.hoveredObjectId ||
         param.point === undefined ||
         !param.time ||
         param.point.x < 0 ||
@@ -117,16 +98,13 @@ export const ChartComponent = (props: any) => {
         // thus it will be YYYY-MM-DD
         const dateStr = param.time;
         toolTip.style.display = "block";
-        const data = param.seriesData.get(series)!;
+        const data = param.seriesData.get(newSeries)!;
         // @ts-ignore
         const price = data.value ?? data.close;
-        toolTip.innerHTML = `<div style="color: ${"#2962FF"}">Apple Inc.</div><div style="font-size: 24px; margin: 4px 0px; color: ${"black"}">
-          ${Math.round(100 * price) / 100}
-          </div><div style="color: ${"black"}">
-          ${dateStr}
-          </div>`;
+        setPrice(price);
+        setDate(dateStr as string);
 
-        const coordinate = series.priceToCoordinate(price);
+        const coordinate = newSeries.priceToCoordinate(price);
         let shiftedCoordinate = param.point.x - 50;
         if (coordinate === null) {
           return;
@@ -137,7 +115,7 @@ export const ChartComponent = (props: any) => {
             ? coordinate - toolTipHeight - toolTipMargin
             : Math.max(0, Math.min(container.clientHeight - toolTipHeight - toolTipMargin, coordinate + toolTipMargin));
         toolTip.style.left = shiftedCoordinate + "px";
-        toolTip.style.top = coordinateY + "px";
+        toolTip.style.top = "100%";
       }
     });
 
@@ -148,8 +126,19 @@ export const ChartComponent = (props: any) => {
       topColor: areaTopColor,
       bottomColor: areaBottomColor,
     });
-    newSeries.setData(data);
+    newSeries.setData(initialData);
 
+    newSeries.setMarkers([
+      {
+        time: "2018-12-29",
+        position: "belowBar",
+        color: "red",
+        shape: "circle",
+        id: "id123",
+        text: "@ElonMusk",
+        size: 1,
+      },
+    ]);
     window.addEventListener("resize", handleResize);
 
     return () => {
@@ -159,16 +148,20 @@ export const ChartComponent = (props: any) => {
     };
   }, [data, backgroundColor, lineColor, textColor, areaTopColor, areaBottomColor]);
 
-  return <div ref={chartContainerRef} />;
+  return (
+    <div className="relative">
+      <Tweet date={date} price={price} className="tool-tip hidden absolute z-[1000]" />
+      <div ref={chartContainerRef} />
+    </div>
+  );
 };
 
 const CoinChart = () => {
   const ref = useRef<HTMLDivElement | null>(null);
   const scroll = useInViewport(ref);
   return (
-    <div id="CoinChart" className="coin-charts relative">
-      <ChartComponent data={initialData} ref={ref} />
-
+    <div id="chart" className="coin-charts relative" ref={ref}>
+      <ChartComponent data={initialData} />
       <p>{JSON.stringify(scroll)}</p>
     </div>
   );
