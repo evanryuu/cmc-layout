@@ -58,7 +58,7 @@ const CoinCommunity = () => {
                 key={ele.id}
               >
                 <div>id: {ele.id}</div>
-                <div>{ele.body.slice(120)}</div>
+                <div>{ele.body}</div>
                 {/* Row: {ele.id}
                 <div>{ele.title}</div>
                 <div>{ele.body}</div> */}
